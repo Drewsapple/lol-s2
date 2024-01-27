@@ -1,32 +1,63 @@
-/**
- * Welcome to Cloudflare Workers! This is your first worker.
- *
- * - Run `npm run dev` in your terminal to start a development server
- * - Open a browser tab at http://localhost:8787/ to see your worker in action
- * - Run `npm run deploy` to publish your worker
- *
- * Learn more at https://developers.cloudflare.com/workers/
- */
+import { Hono } from 'hono';
+import { html } from 'hono/html';
+import { serveStatic } from 'hono/cloudflare-workers';
 
-export interface Env {
-	// Example binding to KV. Learn more at https://developers.cloudflare.com/workers/runtime-apis/kv/
-	// MY_KV_NAMESPACE: KVNamespace;
-	//
-	// Example binding to Durable Object. Learn more at https://developers.cloudflare.com/workers/runtime-apis/durable-objects/
-	// MY_DURABLE_OBJECT: DurableObjectNamespace;
-	//
-	// Example binding to R2. Learn more at https://developers.cloudflare.com/workers/runtime-apis/r2/
-	// MY_BUCKET: R2Bucket;
-	//
-	// Example binding to a Service. Learn more at https://developers.cloudflare.com/workers/runtime-apis/service-bindings/
-	// MY_SERVICE: Fetcher;
-	//
-	// Example binding to a Queue. Learn more at https://developers.cloudflare.com/queues/javascript-apis/
-	// MY_QUEUE: Queue;
+const app = new Hono();
+
+const ORIGIN = 'https://lol-s2.dfish.workers.dev';
+const LAST_PAGE = 5;
+
+function frameResponse(title: string, image: string, buttons: string[], targetRoute: string) {
+	return html`<html>
+		<head>
+			<title>${title}</title>
+			<meta property="og:title" content="${title}" />
+			<meta property="og:image" content="${image}" />
+			<meta property="fc:frame" content="vNext" />
+			<meta property="fc:frame:image" content="${image}" />
+			${buttons.map((button, i) => html`<meta property="fc:frame:button:${i + 1}" content="${button}" />`)}
+			<meta property="fc:frame:post_url" content="${targetRoute}" />
+		</head>
+		<body>
+			This page is intended to be viewed as a frame on farcaster.
+		</body>
+	</html> `;
 }
 
-export default {
-	async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
-		return new Response('Hello World!');
-	},
-};
+function pageToImageFilename(folderName: string, page: number) {
+	return `/${folderName}-frames/${String(page * 3 + 1).padStart(4, '0')}.jpg`;
+}
+
+app.get('/', (c) => c.text(`Testing`));
+
+app.get('/test-frames/*', serveStatic({ root: './', rewriteRequestPath: (path) => path.replace(/^\/test-frames/, '/test') }));
+app.get('/test', (c) => c.html(frameResponse('test', `${ORIGIN}${pageToImageFilename('test', 0)}`, ['>'], `${ORIGIN}/test/0`)));
+
+app.post('/test/:page', async (c) => {
+	const page = parseInt(c.req.param('page'));
+	const action = (await c.req.json())['untrustedData']['buttonIndex'];
+	c.status(200);
+	let targetPage;
+	if (action === 1) {
+		if (page === 0) {
+			// the first action button on page 0 is the next
+			targetPage = 1;
+		}
+		targetPage = page - 1;
+	} else {
+		targetPage = page + 1;
+	}
+
+	let buttons = [];
+	if (targetPage === 0) {
+		buttons = ['>'];
+	} else if (targetPage === LAST_PAGE) {
+		buttons = ['<'];
+	} else {
+		buttons = ['<', '>'];
+	}
+
+	return c.html(frameResponse('test', `${ORIGIN}${pageToImageFilename('test', targetPage)}`, buttons, `${ORIGIN}/test/${targetPage}`));
+});
+
+export default app;
