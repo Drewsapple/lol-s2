@@ -4,8 +4,8 @@ import { serveStatic } from 'hono/cloudflare-workers';
 
 const app = new Hono();
 
-const ORIGIN = 'https://lol-s2.dfish.workers.dev';
-const LAST_PAGE = 5;
+const ORIGIN = 'https://lol-s2.drewf.workers.dev';
+const LAST_PAGE = 23;
 
 function frameResponse(title: string, image: string, buttons: string[], targetRoute: string) {
 	return html`<html>
@@ -25,15 +25,22 @@ function frameResponse(title: string, image: string, buttons: string[], targetRo
 }
 
 function pageToImageFilename(folderName: string, page: number) {
-	return `/${folderName}-frames/${String(page * 3 + 1).padStart(4, '0')}.jpg`;
+	if (folderName === 'lols2') {
+		const frameOf = [
+			25, 116, 180, 243, 295, 356, 411, 489, 568, 668, 733, 779, 800, 861, 894, 964, 1074, 1154, 1185, 1206, 1281, 1323, 1335,
+		] as const;
+		return `/${folderName}-frames/${String(frameOf[page]).padStart(4, '0')}.jpg`;
+	}
+
+	return `/${folderName}-frames/${String(page + 1).padStart(4, '0')}.jpg`;
 }
 
 app.get('/', (c) => c.text(`Testing`));
 
-app.get('/test-frames/*', serveStatic({ root: './', rewriteRequestPath: (path) => path.replace(/^\/test-frames/, '/test') }));
-app.get('/test', (c) => c.html(frameResponse('test', `${ORIGIN}${pageToImageFilename('test', 0)}`, ['>'], `${ORIGIN}/test/0`)));
+app.get('/lols2-frames/*', serveStatic({ root: './', rewriteRequestPath: (path) => path.replace(/^\/lols2-frames/, '/lols2') }));
+app.get('/lols2', (c) => c.html(frameResponse('lols2', `${ORIGIN}${pageToImageFilename('lols2', 0)}`, ['>'], `${ORIGIN}/lols2/0`)));
 
-app.post('/test/:page', async (c) => {
+app.post('/lols2/:page', async (c) => {
 	const page = parseInt(c.req.param('page'));
 	const action = (await c.req.json())['untrustedData']['buttonIndex'];
 	c.status(200);
@@ -57,7 +64,7 @@ app.post('/test/:page', async (c) => {
 		buttons = ['<', '>'];
 	}
 
-	return c.html(frameResponse('test', `${ORIGIN}${pageToImageFilename('test', targetPage)}`, buttons, `${ORIGIN}/test/${targetPage}`));
+	return c.html(frameResponse('lols2', `${ORIGIN}${pageToImageFilename('lols2', targetPage)}`, buttons, `${ORIGIN}/lols2/${targetPage}`));
 });
 
 export default app;
