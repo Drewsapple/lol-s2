@@ -4,8 +4,8 @@ import { serveStatic } from 'hono/cloudflare-workers';
 
 const app = new Hono();
 
-const ORIGIN = 'https://lol-s2.drewf.workers.dev';
-const LAST_PAGE = 23;
+const ORIGIN = 'https://lols2.danksh.art';
+const LAST_PAGE = 23 - 1;
 
 function frameResponse(title: string, image: string, buttons: string[], targetRoute: string) {
 	return html`<html>
@@ -35,10 +35,8 @@ function pageToImageFilename(folderName: string, page: number) {
 	return `/${folderName}-frames/${String(page + 1).padStart(4, '0')}.jpg`;
 }
 
-app.get('/', (c) => c.text(`Testing`));
-
 app.get('/lols2-frames/*', serveStatic({ root: './', rewriteRequestPath: (path) => path.replace(/^\/lols2-frames/, '/lols2') }));
-app.get('/lols2', (c) => c.html(frameResponse('lols2', `${ORIGIN}${pageToImageFilename('lols2', 0)}`, ['>'], `${ORIGIN}/lols2/0`)));
+app.get('/', (c) => c.html(frameResponse('lols2', `${ORIGIN}${pageToImageFilename('lols2', 0)}`, ['>'], `${ORIGIN}/lols2/0`)));
 
 app.post('/lols2/:page', async (c) => {
 	const page = parseInt(c.req.param('page'));
@@ -49,8 +47,9 @@ app.post('/lols2/:page', async (c) => {
 		if (page === 0) {
 			// the first action button on page 0 is the next
 			targetPage = 1;
+		} else {
+			targetPage = page - 1;
 		}
-		targetPage = page - 1;
 	} else {
 		targetPage = page + 1;
 	}
